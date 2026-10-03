@@ -85,6 +85,8 @@ export interface CreateSandboxOptions {
   readonly copyToWorktree?: string[];
   /** Override default timeouts for built-in lifecycle steps. Unset keys keep their defaults. */
   readonly timeouts?: Timeouts;
+  /** Additional environment variables merged into the agent provider's env inside the sandbox. */
+  readonly agentProviderEnv?: Record<string, string>;
   /** @internal Test-only overrides to bypass the sandbox provider. */
   readonly _test?: {
     readonly buildSandbox?: (sandboxDir: string) => SandboxService;
@@ -226,6 +228,8 @@ export interface Sandbox {
   readonly branch: string;
   /** Host path to the worktree. */
   readonly worktreePath: string;
+  /** Provider-assigned container or sandbox name, when available. */
+  readonly containerName?: string;
   /** Invoke an agent inside the existing sandbox. */
   run(options: SandboxRunOptions): Promise<SandboxRunResult>;
   /** Launch an interactive agent session inside the existing sandbox. */
@@ -323,8 +327,13 @@ const buildSandboxHandle = (
   // as-is and let the lifecycle delete the temp branch normally.
   const mergeToHead = branchStrategy?.type === "merge-to-head";
 
+  const containerName =
+    providerHandle && "containerName" in providerHandle
+      ? providerHandle.containerName
+      : undefined;
   const sandboxHandle: Sandbox = {
     branch,
+    containerName,
     worktreePath: worktreePath,
 
     run: async (runOptions: SandboxRunOptions): Promise<SandboxRunResult> => {
@@ -526,6 +535,7 @@ const buildSandboxHandle = (
               ...runOptions,
               ...resumeOptions,
               prompt: nextPrompt,
+              promptArgs: undefined,
               promptFile: undefined,
               maxIterations: 1,
               resumeSession: capturedSessionId,
@@ -539,6 +549,7 @@ const buildSandboxHandle = (
               ...forkOptions,
               prompt: nextPrompt,
               promptFile: undefined,
+              promptArgs: undefined,
               maxIterations: 1,
               resumeSession: capturedSessionId,
               forkSession: true,
@@ -713,6 +724,7 @@ export interface CreateSandboxFromWorktreeOptions {
   readonly hooks?: SandboxHooks;
   readonly copyToWorktree?: string[];
   readonly timeouts?: Timeouts;
+  readonly agentProviderEnv?: Record<string, string>;
   /** Forwarded to the Sandbox handle. Set by `createWorktree` so the handle
    *  can route run()/interactive() correctly: for `merge-to-head`, each call
    *  merges back to the host's current branch and the worktree's source
@@ -776,7 +788,7 @@ export const createSandboxFromWorktree = async (
     );
     const env = mergeProviderEnv({
       resolvedEnv,
-      agentProviderEnv: {},
+      agentProviderEnv: options.agentProviderEnv ?? {},
       sandboxProviderEnv: options.sandbox.env,
     });
 
@@ -965,7 +977,7 @@ export const createSandbox = async (
             const resolvedEnv = yield* resolveEnv(hostRepoDir);
             const env = mergeProviderEnv({
               resolvedEnv,
-              agentProviderEnv: {},
+              agentProviderEnv: options.agentProviderEnv ?? {},
               sandboxProviderEnv: options.sandbox.env,
             });
 

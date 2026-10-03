@@ -24,6 +24,8 @@ export interface InteractiveExecOptions {
 export interface BindMountSandboxHandle {
   /** Absolute path to the worktree inside the sandbox. */
   readonly worktreePath: string;
+  /** Provider-assigned sandbox name, when the provider exposes one. */
+  readonly containerName?: string;
   /**
    * Execute a command in the sandbox.
    *
